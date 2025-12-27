@@ -125,15 +125,6 @@ const ResultCard: React.FC<ResultCardProps> = ({ result, analysisType }) => {
   };
 
   const colors = getRiskColor(result.riskScore);
-  
-  // SVG Config
-  const radius = 36; // Increased size slightly
-  const circumference = 2 * Math.PI * radius;
-  // Calculate offset based on Safety Score (0 to 100)
-  // 100 safety = full circle (offset 0)
-  // 0 safety = empty circle (offset circumference)
-  // We want to animate this too, but CSS transition handles it well if we pass the target
-  const strokeDashoffset = circumference - (safetyScore / 100) * circumference;
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-8 duration-500">
@@ -141,8 +132,8 @@ const ResultCard: React.FC<ResultCardProps> = ({ result, analysisType }) => {
       <div className={`glass-card rounded-2xl p-8 relative overflow-hidden group`}>
         <div className={`absolute top-0 right-0 w-64 h-64 bg-gradient-to-br from-white/5 to-transparent rounded-bl-full -mr-16 -mt-16 transition-opacity opacity-50`}></div>
         
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6 relative z-10">
-          <div className="flex-1">
+        <div className="flex flex-col gap-6 relative z-10">
+          <div>
              <div className="flex items-center gap-3 mb-2">
                 <span className={`px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wider bg-white/5 border border-white/5 text-zinc-400 flex items-center gap-1.5`}>
                    {getAnalysisTypeIcon()}
@@ -152,56 +143,48 @@ const ResultCard: React.FC<ResultCardProps> = ({ result, analysisType }) => {
                     ID: {Math.random().toString(36).substr(2, 9).toUpperCase()}
                 </span>
              </div>
-             <h2 className={`text-4xl font-bold tracking-tight ${colors.text} mb-1 drop-shadow-sm`}>
+             <h2 className={`text-4xl font-bold tracking-tight ${colors.text} mb-2 drop-shadow-sm`}>
                  {result.verdict}
              </h2>
-             <p className="text-zinc-400 text-sm max-w-md leading-relaxed">
+             <p className="text-zinc-400 text-sm max-w-3xl leading-relaxed">
                  Based on the analysis of provided evidence, this content has been flagged as 
                  <span className={`font-semibold ml-1 ${colors.text}`}>{result.verdict.toLowerCase()}</span>.
              </p>
           </div>
 
-          <div className="relative flex items-center justify-center shrink-0 p-2">
-             {/* Circular Progress Meter */}
-             <div className="relative w-32 h-32">
-                {/* Glow effect behind the meter */}
-                <div className={`absolute inset-0 rounded-full blur-2xl opacity-20 ${colors.bg}`}></div>
-                
-                <svg className="w-full h-full transform -rotate-90">
-                    {/* Background Circle */}
-                    <circle 
-                        cx="64" cy="64" r={radius} 
-                        stroke="currentColor" 
-                        strokeWidth="8" 
-                        fill="transparent" 
-                        className="text-zinc-800/50" 
+          {/* Linear Safety Meter */}
+          <div className="bg-zinc-900/40 rounded-xl p-5 border border-white/5">
+                <div className="flex items-center justify-between mb-3">
+                   <div className="flex items-center gap-2">
+                      <div className={`p-1.5 rounded-lg ${colors.bg} bg-opacity-20`}>
+                          <ShieldCheck className={`w-4 h-4 ${colors.text}`} />
+                      </div>
+                      <span className="text-sm font-medium text-zinc-300">Safety Score</span>
+                   </div>
+                   <div className="flex items-baseline gap-1">
+                       <span className={`text-3xl font-bold tracking-tight ${colors.text}`}>
+                           {displayScore}
+                       </span>
+                       <span className="text-sm font-medium text-zinc-500">/ 100</span>
+                   </div>
+                </div>
+
+                {/* Bar Track */}
+                <div className="h-4 w-full bg-zinc-800 rounded-full overflow-hidden relative">
+                    {/* Bar Fill */}
+                    <div 
+                        className={`absolute top-0 left-0 h-full ${colors.bg} transition-all duration-1000 ease-out shadow-[0_0_15px_currentColor]`}
+                        style={{ width: `${displayScore}%` }}
                     />
-                    {/* Progress Circle */}
-                    <circle 
-                        cx="64" cy="64" r={radius} 
-                        stroke="currentColor" 
-                        strokeWidth="8" 
-                        fill="transparent" 
-                        strokeDasharray={circumference} 
-                        strokeDashoffset={strokeDashoffset} 
-                        strokeLinecap="round"
-                        className={`${colors.stroke} transition-all duration-1000 ease-out`} 
-                    />
-                </svg>
+                    {/* Pattern/Texture overlay */}
+                    <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNCIgaGVpZ2h0PSI0IiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPjxjaXJjbGUgY3g9IjIiIGN5PSIyIiByPSIxIiBmaWxsPSJyZ2JhKDI1NSwyNTUsMjU1LDAuMSkiLz48L3N2Zz4=')] opacity-30"></div>
+                </div>
                 
-                {/* Centered Metric */}
-                <div className="absolute inset-0 flex flex-col items-center justify-center pb-2">
-                    <div className="relative flex items-center justify-center">
-                        <span className={`text-4xl font-bold tracking-tighter ${colors.text}`}>
-                            {displayScore}
-                        </span>
-                        <span className={`absolute left-full top-1 text-lg font-bold ml-0.5 ${colors.text}`}>
-                            %
-                        </span>
-                    </div>
+                <div className="flex justify-between mt-2 text-[10px] text-zinc-500 uppercase tracking-wider font-mono">
+                    <span>High Risk</span>
+                    <span>Safe</span>
                 </div>
              </div>
-          </div>
         </div>
       </div>
 
