@@ -3,7 +3,9 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>FraudShield AI</title>
+    <!-- Content Security Policy for Electron Safety (Permissive for this demo to allow CDN/Inline) -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self' https: data: blob: 'unsafe-inline' 'unsafe-eval';">
+    <title>FraudShield AI - Desktop</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -68,7 +70,14 @@
         background-color: var(--bg-primary);
         color: var(--text-primary);
         transition: background-color 0.3s, color 0.3s;
+        /* Prevent selection in UI elements for app-like feel */
+        user-select: none;
       }
+      /* Allow text selection in specific areas if needed, handled via CSS classes usually */
+      textarea, input, p, pre, code, .selectable {
+          user-select: text;
+      }
+
       ::-webkit-scrollbar {
         width: 6px;
         height: 6px;
