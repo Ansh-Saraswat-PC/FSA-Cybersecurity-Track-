@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { ShieldCheck, ShieldAlert, AlertTriangle, AlertOctagon, CheckCircle2, ChevronRight, Terminal, Image as ImageIcon, Layers, FileText, Video, Music, FileAudio, AlignLeft, ScanText, Activity, Globe } from 'lucide-react';
-import { FraudAnalysisResult } from '../types';
+import { ShieldCheck, ShieldAlert, AlertTriangle, AlertOctagon, CheckCircle2, ChevronRight, Terminal, Image as ImageIcon, Layers, FileText, Video, Music, FileAudio, AlignLeft, ScanText, Activity, Globe, Info } from 'lucide-react';
+import { FraudAnalysisResult, RiskThresholds } from '../types';
 
 interface ResultCardProps {
   result: FraudAnalysisResult;
   analysisType: 'text' | 'image' | 'combined';
+  thresholds: RiskThresholds;
 }
 
-const ResultCard: React.FC<ResultCardProps> = ({ result, analysisType }) => {
+const ResultCard: React.FC<ResultCardProps> = ({ result, analysisType, thresholds }) => {
   const [activeTab, setActiveTab] = useState<'analysis' | 'forensics'>('analysis');
   const [displayScore, setDisplayScore] = useState(0);
 
@@ -40,13 +41,13 @@ const ResultCard: React.FC<ResultCardProps> = ({ result, analysisType }) => {
 
 
   const getRiskColor = (risk: number) => {
-    // Risk < 20 (Safety > 80) -> Green
-    if (risk < 20) return { text: 'text-emerald-400', bg: 'bg-emerald-500', border: 'border-emerald-500/30', glow: 'shadow-emerald-500/20', stroke: 'text-emerald-500' };
-    // Risk < 50 (Safety > 50) -> Yellow
-    if (risk < 50) return { text: 'text-yellow-400', bg: 'bg-yellow-500', border: 'border-yellow-500/30', glow: 'shadow-yellow-500/20', stroke: 'text-yellow-500' };
-    // Risk < 80 (Safety > 20) -> Orange
-    if (risk < 80) return { text: 'text-orange-400', bg: 'bg-orange-500', border: 'border-orange-500/30', glow: 'shadow-orange-500/20', stroke: 'text-orange-500' };
-    // Risk >= 80 (Safety < 20) -> Red
+    // Risk <= low (Safe) -> Green
+    if (risk <= thresholds.low) return { text: 'text-emerald-400', bg: 'bg-emerald-500', border: 'border-emerald-500/30', glow: 'shadow-emerald-500/20', stroke: 'text-emerald-500' };
+    // Risk <= medium (Suspicious) -> Yellow
+    if (risk <= thresholds.medium) return { text: 'text-yellow-400', bg: 'bg-yellow-500', border: 'border-yellow-500/30', glow: 'shadow-yellow-500/20', stroke: 'text-yellow-500' };
+    // Risk <= high (High Risk) -> Orange
+    if (risk <= thresholds.high) return { text: 'text-orange-400', bg: 'bg-orange-500', border: 'border-orange-500/30', glow: 'shadow-orange-500/20', stroke: 'text-orange-500' };
+    // Risk > high (Critical) -> Red
     return { text: 'text-red-500', bg: 'bg-red-500', border: 'border-red-500/30', glow: 'shadow-red-500/20', stroke: 'text-red-500' };
   };
 
@@ -227,10 +228,25 @@ const ResultCard: React.FC<ResultCardProps> = ({ result, analysisType }) => {
                     </h3>
                     {result.redFlags.length > 0 ? (
                         <ul className="space-y-3">
-                        {result.redFlags.map((flag, idx) => (
-                            <li key={idx} className="flex items-start gap-3 text-sm text-zinc-300">
+                        {result.redFlags.map((item, idx) => (
+                            <li key={idx} className="flex items-start gap-3 text-sm text-zinc-300 group/tooltip relative">
                             <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-red-500 shrink-0 shadow-[0_0_8px_rgba(239,68,68,0.5)]" />
-                            <span className="leading-relaxed">{flag}</span>
+                            <div className="flex-1 flex items-center flex-wrap gap-2">
+                                <span className="leading-relaxed font-medium">{item.flag}</span>
+                                <div className="bg-zinc-800/50 p-1 rounded-full text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800 transition-colors cursor-help">
+                                    <Info className="w-3 h-3" />
+                                </div>
+                            </div>
+                            
+                            {/* Tooltip */}
+                            <div className="absolute bottom-full left-4 mb-2 w-56 p-3 bg-zinc-950/95 border border-white/10 rounded-xl shadow-2xl backdrop-blur-md opacity-0 translate-y-2 group-hover/tooltip:opacity-100 group-hover/tooltip:translate-y-0 transition-all duration-200 pointer-events-none z-50">
+                                <div className="text-xs text-zinc-400 leading-relaxed">
+                                    <span className="text-white font-semibold block mb-1">What this means:</span>
+                                    {item.explanation}
+                                </div>
+                                {/* Arrow */}
+                                <div className="absolute bottom-[-6px] left-4 w-3 h-3 bg-zinc-950/95 border-r border-b border-white/10 rotate-45 transform"></div>
+                            </div>
                             </li>
                         ))}
                         </ul>

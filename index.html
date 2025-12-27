@@ -10,6 +10,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
     <script>
       tailwind.config = {
+        darkMode: 'class',
         theme: {
           extend: {
             fontFamily: {
@@ -17,11 +18,12 @@
               mono: ['JetBrains Mono', 'monospace'],
             },
             colors: {
-              background: '#09090b', // Zinc 950
-              surface: '#18181b', // Zinc 900
-              surfaceHighlight: '#27272a', // Zinc 800
-              primary: '#6366f1', // Indigo 500
-              secondary: '#ec4899', // Pink 500
+              background: 'var(--bg-primary)',
+              surface: 'var(--bg-secondary)',
+              surfaceHighlight: 'var(--bg-tertiary)',
+              textMain: 'var(--text-primary)',
+              textMuted: 'var(--text-secondary)',
+              border: 'var(--border-color)',
             },
             animation: {
                 'blob': 'blob 7s infinite',
@@ -40,9 +42,32 @@
       }
     </script>
     <style>
+      :root {
+        --bg-primary: #09090b; /* Zinc 950 */
+        --bg-secondary: #18181b; /* Zinc 900 */
+        --bg-tertiary: #27272a; /* Zinc 800 */
+        --text-primary: #e4e4e7; /* Zinc 200 */
+        --text-secondary: #a1a1aa; /* Zinc 400 */
+        --border-color: rgba(255, 255, 255, 0.08);
+        --glass-bg: rgba(255, 255, 255, 0.03);
+        --glass-border: rgba(255, 255, 255, 0.05);
+      }
+
+      :root.light {
+        --bg-primary: #f8fafc; /* Slate 50 */
+        --bg-secondary: #ffffff; /* White */
+        --bg-tertiary: #f1f5f9; /* Slate 100 */
+        --text-primary: #0f172a; /* Slate 900 */
+        --text-secondary: #64748b; /* Slate 500 */
+        --border-color: rgba(0, 0, 0, 0.08);
+        --glass-bg: rgba(0, 0, 0, 0.03);
+        --glass-border: rgba(0, 0, 0, 0.05);
+      }
+
       body {
-        background-color: #09090b;
-        color: #e4e4e7;
+        background-color: var(--bg-primary);
+        color: var(--text-primary);
+        transition: background-color 0.3s, color 0.3s;
       }
       ::-webkit-scrollbar {
         width: 6px;
@@ -52,21 +77,25 @@
         background: transparent; 
       }
       ::-webkit-scrollbar-thumb {
-        background: #3f3f46; 
+        background: var(--bg-tertiary); 
         border-radius: 3px;
       }
       ::-webkit-scrollbar-thumb:hover {
-        background: #52525b; 
+        background: var(--text-secondary); 
       }
       .glass {
         background: rgba(24, 24, 27, 0.6);
         backdrop-filter: blur(12px);
-        border: 1px solid rgba(255, 255, 255, 0.08);
+        border: 1px solid var(--border-color);
+      }
+      :root.light .glass {
+        background: rgba(255, 255, 255, 0.6);
+        border: 1px solid var(--border-color);
       }
       .glass-card {
-        background: rgba(255, 255, 255, 0.03);
+        background: var(--glass-bg);
         backdrop-filter: blur(10px);
-        border: 1px solid rgba(255, 255, 255, 0.05);
+        border: 1px solid var(--glass-border);
       }
     </style>
   <script type="importmap">

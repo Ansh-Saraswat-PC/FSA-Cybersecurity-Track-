@@ -17,8 +17,15 @@ const responseSchema: Schema = {
     },
     redFlags: {
       type: Type.ARRAY,
-      items: { type: Type.STRING },
-      description: "A list of specific red flags found in the content (e.g., 'Urgency', 'Too good to be true').",
+      items: { 
+        type: Type.OBJECT,
+        properties: {
+          flag: { type: Type.STRING, description: "The name of the red flag (e.g., 'Urgency')" },
+          explanation: { type: Type.STRING, description: "A concise explanation of why this is a flag (max 15 words)." }
+        },
+        required: ["flag", "explanation"]
+      },
+      description: "A list of specific red flags found in the content with brief explanations.",
     },
     analysis: {
       type: Type.STRING,
@@ -39,6 +46,15 @@ const responseSchema: Schema = {
     }
   },
   required: ["riskScore", "verdict", "redFlags", "analysis", "recommendations"],
+};
+
+export const createChatSession = () => {
+  return ai.chats.create({
+    model: 'gemini-3-flash-preview',
+    config: {
+      systemInstruction: "You are Cyberfriend, a knowledgeable and friendly cybersecurity assistant. Your goal is to help users understand online risks, identify potential scams, and provide best practices for digital safety. Be concise, encouraging, and easy to understand. If a user asks about a specific suspicious message, advise them to use the 'Text Analysis' or 'Image Analysis' tools in this app for a detailed forensic check.",
+    }
+  });
 };
 
 export const analyzeContent = async (
@@ -151,7 +167,7 @@ export const analyzeContent = async (
         OUTPUT FORMAT (Strictly follow this text format for parsing):
         RISK_SCORE: <0-100>
         VERDICT: <Safe|Low Risk|Suspicious|High Risk|Critical>
-        RED_FLAGS: <flag1>|<flag2>|<flag3>
+        RED_FLAGS: <flag1> - <explanation1> | <flag2> - <explanation2>
         RECOMMENDATIONS: <rec1>|<rec2>|<rec3>
         TRANSCRIPT: <text or "N/A">
         OCR_TEXT: <text or "N/A">
@@ -212,10 +228,31 @@ function parseTextResponse(text: string, groundingChunks?: any[]): FraudAnalysis
     const analysisStart = text.indexOf("ANALYSIS:");
     const analysis = analysisStart !== -1 ? text.substring(analysisStart + 9).trim() : text;
 
+    let redFlagsObj: { flag: string, explanation: string }[] = [];
+    if (redFlagsMatch) {
+        redFlagsObj = redFlagsMatch[1].split('|').map(s => {
+            const parts = s.split(' - ');
+            // If we have a hyphen separator, assume first part is flag, second is explanation
+            // If not, use the whole string as flag
+            if (parts.length >= 2) {
+                return { 
+                    flag: parts[0].trim(), 
+                    explanation: parts.slice(1).join(' - ').trim() 
+                };
+            }
+            return { 
+                flag: s.trim(), 
+                explanation: "Potential fraud indicator." 
+            };
+        }).filter(f => f.flag);
+    } else {
+        redFlagsObj = [{ flag: "Potential Unknown Risk", explanation: "Manual review recommended." }];
+    }
+
     return {
         riskScore: riskScoreMatch ? parseInt(riskScoreMatch[1]) : 50,
         verdict: (verdictMatch ? verdictMatch[1] : 'Suspicious') as any,
-        redFlags: redFlagsMatch ? redFlagsMatch[1].split('|').map(s => s.trim()).filter(s => s) : ["Potential Unknown Risk"],
+        redFlags: redFlagsObj,
         recommendations: recommendationsMatch ? recommendationsMatch[1].split('|').map(s => s.trim()).filter(s => s) : ["Verify independently"],
         transcript: transcriptMatch && transcriptMatch[1] !== "N/A" ? transcriptMatch[1].trim() : undefined,
         ocrText: ocrMatch && ocrMatch[1] !== "N/A" ? ocrMatch[1].trim() : undefined,
