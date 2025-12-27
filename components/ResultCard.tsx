@@ -58,6 +58,72 @@ const ResultCard: React.FC<ResultCardProps> = ({ result, analysisType }) => {
       }
   };
 
+  const renderStyledText = (text: string) => {
+    // Split by bold markers
+    const parts = text.split(/(\*\*.*?\*\*)/g);
+    return parts.map((part, i) => {
+      if (part.startsWith('**') && part.endsWith('**')) {
+        return <strong key={i} className="text-zinc-200 font-semibold">{part.slice(2, -2)}</strong>;
+      }
+      return part;
+    });
+  };
+
+  const renderAnalysisContent = (text: string) => {
+      if (!text) return null;
+      // Split by double newlines to separate paragraphs/blocks
+      const blocks = text.split(/\n\n+/);
+
+      return blocks.map((block, index) => {
+          const trimmedBlock = block.trim();
+          if (!trimmedBlock) return null;
+
+          // Check if block contains list items
+          if (trimmedBlock.includes('\n* ') || trimmedBlock.startsWith('* ') || trimmedBlock.includes('\n- ') || trimmedBlock.startsWith('- ')) {
+              const lines = trimmedBlock.split('\n');
+              const listItems: React.ReactNode[] = [];
+              const otherLines: React.ReactNode[] = [];
+
+              lines.forEach((line, lineIdx) => {
+                  const trimmedLine = line.trim();
+                  if (trimmedLine.startsWith('* ') || trimmedLine.startsWith('- ')) {
+                      listItems.push(
+                          <li key={`li-${index}-${lineIdx}`} className="pl-1">
+                              {renderStyledText(trimmedLine.substring(2))}
+                          </li>
+                      );
+                  } else {
+                      // If there's a non-list line inside a block identified as having lists, render it as text
+                      // This handles "Header:\n* item"
+                      otherLines.push(
+                          <div key={`txt-${index}-${lineIdx}`} className="mb-2">
+                             {renderStyledText(line)}
+                          </div>
+                      );
+                  }
+              });
+
+              return (
+                  <div key={index} className="mb-4">
+                      {otherLines}
+                      {listItems.length > 0 && (
+                          <ul className="list-disc pl-5 space-y-1 text-zinc-300 mt-2">
+                              {listItems}
+                          </ul>
+                      )}
+                  </div>
+              );
+          }
+
+          // Regular Paragraph
+          return (
+              <p key={index} className="mb-4 text-zinc-400 text-sm leading-7">
+                  {renderStyledText(trimmedBlock)}
+              </p>
+          );
+      });
+  };
+
   const colors = getRiskColor(result.riskScore);
   
   // SVG Config
@@ -210,9 +276,9 @@ const ResultCard: React.FC<ResultCardProps> = ({ result, analysisType }) => {
                  {/* Full Analysis Text */}
                 <div className="glass-card rounded-2xl p-6">
                     <h3 className="text-sm font-semibold text-zinc-300 mb-3 uppercase tracking-wider">Comprehensive Analysis</h3>
-                    <p className="text-zinc-400 text-sm leading-7 whitespace-pre-wrap">
-                        {result.analysis}
-                    </p>
+                    <div className="text-zinc-400 text-sm">
+                        {renderAnalysisContent(result.analysis)}
+                    </div>
                 </div>
                 
                 {/* Verified Sources / Grounding */}
