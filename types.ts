@@ -4,6 +4,14 @@ export interface FraudAnalysisResult {
   redFlags: string[];
   analysis: string;
   recommendations: string[];
+  transcript?: string;
+  ocrText?: string;
+  groundingChunks?: {
+    web?: {
+      uri: string;
+      title: string;
+    }
+  }[];
 }
 
 export interface AnalysisRequest {

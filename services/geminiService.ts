@@ -29,64 +29,153 @@ const responseSchema: Schema = {
       items: { type: Type.STRING },
       description: "Actionable advice for the user (e.g., 'Do not click the link', 'Verify the sender').",
     },
+    transcript: {
+      type: Type.STRING,
+      description: "If audio/video was provided, provide the verbatim transcript.",
+    },
+    ocrText: {
+      type: Type.STRING,
+      description: "If an image or document was provided, provide the raw text extracted via OCR.",
+    }
   },
   required: ["riskScore", "verdict", "redFlags", "analysis", "recommendations"],
 };
 
 export const analyzeContent = async (
   text: string,
-  base64Image?: string,
-  mimeType: string = "image/png"
+  fileData?: string,
+  mimeType: string = "image/png",
+  checkSource: boolean = false
 ): Promise<FraudAnalysisResult> => {
   try {
     const parts: any[] = [];
 
+    // Add primary text input if exists
     if (text) {
       parts.push({ text: `Analyze this content for fraud, scams, or malicious intent. Text content: "${text}"` });
     }
 
-    if (base64Image) {
-      // Remove data URL prefix if present
-      const cleanBase64 = base64Image.replace(/^data:image\/(png|jpeg|jpg|webp);base64,/, "");
-      parts.push({
-        inlineData: {
-          data: cleanBase64,
-          mimeType: mimeType,
-        },
-      });
-      
-      const imagePrompt = text 
-        ? "Also analyze the provided image for visual indicators of scams (fake screenshots, manipulated branding, phishing layouts) and check for consistency with the text." 
-        : "Analyze the provided image for visual indicators of scams (fake screenshots, manipulated branding, phishing layouts, suspicious text in image).";
-      
-      parts.push({ text: imagePrompt });
+    if (fileData) {
+      if (mimeType.startsWith("image/")) {
+          // Handle Image
+          const cleanBase64 = fileData.replace(/^data:image\/(png|jpeg|jpg|webp);base64,/, "");
+          parts.push({
+            inlineData: {
+              data: cleanBase64,
+              mimeType: mimeType,
+            },
+          });
+          parts.push({ 
+            text: text 
+                ? "Also analyze the provided image for visual indicators of scams and consistency with the text." 
+                : "Analyze the provided image for visual indicators of scams (fake screenshots, manipulated branding)." 
+          });
+
+      } else if (mimeType === "application/pdf") {
+          // Handle PDF
+          const cleanBase64 = fileData.replace(/^data:application\/pdf;base64,/, "");
+          parts.push({
+            inlineData: {
+              data: cleanBase64,
+              mimeType: "application/pdf",
+            },
+          });
+          parts.push({ 
+            text: text
+                ? "Also analyze the provided PDF document context and consistency with the user text."
+                : "Analyze the provided PDF document for fraud indicators, suspicious contract terms, or fake formatting."
+          });
+
+      } else if (mimeType.startsWith("audio/") || mimeType.startsWith("video/")) {
+           // Handle Audio and Video
+           const base64Data = fileData.split(',')[1];
+           parts.push({
+               inlineData: {
+                   data: base64Data,
+                   mimeType: mimeType
+               }
+           });
+           parts.push({
+               text: "Analyze the audio/video content. 1) Transcribe the speech. 2) Analyze the spoken content and visual cues (if video) for fraud indicators like urgency, voice cloning artifacts, or scam scripts."
+           });
+           
+      } else if (mimeType === "text/plain") {
+          // Handle extracted text (e.g. from DOCX)
+          parts.push({
+              text: `\n--- ATTACHED DOCUMENT CONTENT START ---\n${fileData}\n--- ATTACHED DOCUMENT CONTENT END ---\n`
+          });
+          parts.push({
+              text: text
+                ? "Analyze the user provided text and the attached document content above for fraud."
+                : "Analyze the attached document content above for potential fraud or scam indicators."
+          });
+      }
     }
 
     if (parts.length === 0) {
       throw new Error("No content provided for analysis.");
     }
 
+    // Configure the request based on whether we are using search grounding
+    let model = "gemini-3-flash-preview";
+    let tools = checkSource ? [{ googleSearch: {} }] : undefined;
+    
+    // If using Search, we cannot use JSON mode reliably for the strict schema, 
+    // so we prompt for a structured text format and parse it.
+    let systemInstruction = `You are an elite cybersecurity and fraud detection expert. 
+        Your job is to analyze social media posts, messages, documents (PDF/Word), audio, and video for scam patterns.
+        
+        ${checkSource ? `
+        CRITICAL: YOU HAVE ACCESS TO GOOGLE SEARCH. 
+        1. Use Google Search to verify the claims, images, products, or entities in the content.
+        2. Check if the product images are stolen from legitimate sites (e.g. Amazon, eBay) but the user is linking to a different/suspicious site.
+        3. Verify if the text is a known copypasta or scam script.
+        4. If the content is found on legitimate sites but the context implies a scam (price too low, wrong domain), FLAG IT AS HIGH RISK.
+        ` : ''}
+
+        For Images/Docs:
+        - Extract ALL visible text (OCR).
+        - Look for visual red flags (fake logos, bad formatting).
+
+        For Audio/Video:
+        - Listen carefully to the speech and provide a transcript.
+        - Identify robotic/AI-generated voices vs natural speech.
+        
+        General Red Flags:
+        - Urgency or fear tactics
+        - Promises of unrealistic returns
+        - Suspicious links or domains
+        - Grammar and spelling errors
+        
+        ${checkSource ? `
+        OUTPUT FORMAT (Strictly follow this text format for parsing):
+        RISK_SCORE: <0-100>
+        VERDICT: <Safe|Low Risk|Suspicious|High Risk|Critical>
+        RED_FLAGS: <flag1>|<flag2>|<flag3>
+        RECOMMENDATIONS: <rec1>|<rec2>|<rec3>
+        TRANSCRIPT: <text or "N/A">
+        OCR_TEXT: <text or "N/A">
+        ANALYSIS: <Full detailed analysis here...>
+        ` : `Provide a strict, no-nonsense assessment. Always populate 'ocrText' for images/docs and 'transcript' for audio/video if applicable.`}`;
+
+    const config: any = {
+      systemInstruction: systemInstruction,
+    };
+
+    if (!checkSource) {
+        config.responseMimeType = "application/json";
+        config.responseSchema = responseSchema;
+    } else {
+        config.tools = tools;
+    }
+
     const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
+      model: model,
       contents: {
         role: "user",
         parts: parts,
       },
-      config: {
-        systemInstruction: `You are an elite cybersecurity and fraud detection expert. 
-        Your job is to analyze social media posts, messages, and images for scam patterns.
-        Look for:
-        - Urgency or fear tactics
-        - Promises of unrealistic returns (crypto, giveaways)
-        - Suspicious links or domains
-        - Grammar and spelling errors in official-looking communications
-        - Requests for personal info or money
-        - Fake engagement metrics or manipulated screenshots
-        
-        Provide a strict, no-nonsense assessment.`,
-        responseMimeType: "application/json",
-        responseSchema: responseSchema,
-      },
+      config: config,
     });
 
     const resultText = response.text;
@@ -94,9 +183,43 @@ export const analyzeContent = async (
       throw new Error("Empty response from Gemini.");
     }
 
-    return JSON.parse(resultText) as FraudAnalysisResult;
+    // Get grounding metadata (source links) if available
+    const groundingChunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks;
+
+    if (checkSource) {
+        // Parse the text format
+        return parseTextResponse(resultText, groundingChunks);
+    } else {
+        // Parse JSON
+        return JSON.parse(resultText) as FraudAnalysisResult;
+    }
+
   } catch (error) {
     console.error("Gemini Analysis Error:", error);
     throw error;
   }
 };
+
+function parseTextResponse(text: string, groundingChunks?: any[]): FraudAnalysisResult {
+    const riskScoreMatch = text.match(/RISK_SCORE:\s*(\d+)/i);
+    const verdictMatch = text.match(/VERDICT:\s*(Safe|Low Risk|Suspicious|High Risk|Critical)/i);
+    const redFlagsMatch = text.match(/RED_FLAGS:\s*(.*)/i);
+    const recommendationsMatch = text.match(/RECOMMENDATIONS:\s*(.*)/i);
+    const transcriptMatch = text.match(/TRANSCRIPT:\s*(.*)/i);
+    const ocrMatch = text.match(/OCR_TEXT:\s*(.*)/i);
+    
+    // Extract Analysis (everything after ANALYSIS:)
+    const analysisStart = text.indexOf("ANALYSIS:");
+    const analysis = analysisStart !== -1 ? text.substring(analysisStart + 9).trim() : text;
+
+    return {
+        riskScore: riskScoreMatch ? parseInt(riskScoreMatch[1]) : 50,
+        verdict: (verdictMatch ? verdictMatch[1] : 'Suspicious') as any,
+        redFlags: redFlagsMatch ? redFlagsMatch[1].split('|').map(s => s.trim()).filter(s => s) : ["Potential Unknown Risk"],
+        recommendations: recommendationsMatch ? recommendationsMatch[1].split('|').map(s => s.trim()).filter(s => s) : ["Verify independently"],
+        transcript: transcriptMatch && transcriptMatch[1] !== "N/A" ? transcriptMatch[1].trim() : undefined,
+        ocrText: ocrMatch && ocrMatch[1] !== "N/A" ? ocrMatch[1].trim() : undefined,
+        analysis: analysis,
+        groundingChunks: groundingChunks
+    };
+}
