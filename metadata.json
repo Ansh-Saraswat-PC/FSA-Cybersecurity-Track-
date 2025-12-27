@@ -1,0 +1,5 @@
+{
+  "name": "FraudShield AI (FSA)",
+  "description": "A dark-mode dashboard powered by Gemini to analyze social media posts and images for potential fraud and scam patterns.",
+  "requestFramePermissions": []
+}
